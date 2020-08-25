@@ -155,7 +155,7 @@ export class TimelineExtractor {
     }
   }
 
-  GetProcesseResult(): TimelineEvent[] {
+  public GetProcesseResult(): TimelineEvent[] {
     return this.processedTimelineEvents;
   }
 }
