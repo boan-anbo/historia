@@ -1,0 +1,22 @@
+<div fxLayout="column">
+  <div>
+
+    <button (click)="ConsoleText()">Console Text</button>
+    Control
+  </div>
+
+  <div>
+
+    <label>
+      Input Text
+      <textarea [(ngModel)]="__inputText"></textarea>
+    </label>
+    <br>
+    <button (click)="StartProcessing()"
+    [disabled]="__inputText?.length === 0"
+    >Process</button>
+
+  </div>
+
+</div>
+
