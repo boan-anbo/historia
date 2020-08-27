@@ -18,8 +18,8 @@ export class TimelineService {
     }
   }
 
-  LoadTimelines(timelineEvents: TimelineEvent[]) {
-    this.timeline = new Timeline(timelineEvents);
+  LoadTimelines(timelineEvents: TimelineEvent[], tokenizedInputSentences: string[]): void {
+    this.timeline = new Timeline(timelineEvents, tokenizedInputSentences);
   }
 }
 

@@ -4,9 +4,12 @@ import {TimeDetailLevel, TimelineEvent} from './timeline-extractor';
 
 export class Timeline {
   rawTimelineEvents: TimelineEvent[];
+  private tokenizedInputSentences: string[];
   chronology: Chronology;
-  constructor(timelineEvents: TimelineEvent[]) {
+
+  constructor(timelineEvents: TimelineEvent[], tokenizedInputSentences: string[]) {
     this.rawTimelineEvents = timelineEvents;
+    this.tokenizedInputSentences = tokenizedInputSentences;
     this.LoadChronology(timelineEvents);
   }
 
