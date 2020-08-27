@@ -9,3 +9,8 @@
 .day {
   margin-left: 10%;
 }
+
+::ng-deep .time-mark {
+
+  text-decoration: underline brown;
+}

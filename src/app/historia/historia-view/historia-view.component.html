@@ -1,0 +1,75 @@
+<div class="year" *ngFor="let eventYear of GetResult(); let itemIndex = index">
+  <div id="control">
+
+    <div class="year-header">
+      <span>
+        {{ eventYear.year }}年
+      </span>
+    </div>
+    <div class="event">
+<!--      <span>Undated Year Events</span>-->
+      <div *ngFor="let event of eventYear.yearEventsWithoutMonthDay">
+
+
+          <button (click)="event.ToggleFullContext()">Context</button>
+          <span>{{event.GetPreviousContextOnToggle()}}</span>
+          <span style="background: aliceblue">{{event.GetEvent()}}</span>
+          <span>{{event.GetSubsequentContextOnToggle()}}</span>
+          <br>
+
+      </div>
+    </div>
+
+
+
+    <div class="month" *ngFor="let eventMonth of eventYear.monthEvents; let monthIndex = index">
+      <div class="month-header">
+        <span>
+      {{eventMonth.month}}月
+          </span>
+      </div>
+      <div class="event">
+<!--        <span>Undated Month Events</span>-->
+        <div *ngFor="let event of eventMonth.monthEventsWithoutDay">
+
+            <button (click)="event.ToggleFullContext()">Context</button>
+            <span>{{event.GetPreviousContextOnToggle()}}</span>
+            <span style="background: aliceblue">{{event.GetEvent()}}</span>
+            <span>{{event.GetSubsequentContextOnToggle()}}</span>
+            <br>
+        </div>
+      </div>
+
+
+      <div class="day" *ngFor="let eventDay of eventMonth.dayEvents; let dayIndex = index">
+        <div class="day-header">
+          <span>
+            {{eventDay.day}}日
+          </span>
+        </div>
+        <div class="event">
+
+          <div *ngFor="let event of eventDay.dayEvents">
+
+            <button (click)="event.ToggleFullContext()">Context</button>
+            <span>{{event.GetPreviousContextOnToggle()}}</span>
+            <span
+              appHighlight
+              [searchedWords]="[event.GetTimeMarkString()]"
+              classToApply="time-mark"
+              [text]="event.GetEvent()"
+            ></span>
+            <span>{{event.GetSubsequentContextOnToggle()}}</span>
+            <br>
+
+          </div>
+
+      </div>
+
+
+
+  </div>
+
+</div>
+
+

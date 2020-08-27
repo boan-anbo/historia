@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import {TimelineExtractorService} from '../timeline-extractor.service';
 import {TimelineService} from '../timeline.service';
 import {Chronology, YearEvent} from '../timeline.entity';
+import {TimelineEvent} from '../timeline-extractor';
 
 @Component({
   selector: 'app-historia-view',
@@ -31,4 +32,7 @@ export class HistoriaViewComponent implements OnInit {
     return this.extractorService.GetInputText();
   }
 
+  ToggleDisplay(dayEvent: TimelineEvent) {
+
+  }
 }
