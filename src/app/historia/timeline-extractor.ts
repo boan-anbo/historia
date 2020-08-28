@@ -2,7 +2,7 @@ import * as uuid from 'uuid';
 import {Timeline} from './timeline.entity';
 
 export const Patterns = {
-  chineseMatch: /(([1-2]{1}[0-9][0-9][0-9])[年\s][初中末]?)?(([1十]?[0-9一二三四五六七八九十])月[初中末]?)?(([123一二三]?[0-9一二三四五六七八九十])日)?/g
+  chineseMatch: /(([1-2一二]{1}[0-9一二三四五六七八九零][0-9一二三四五六七八九零][0-9一二三四五六七八九零])[年\s][初中末]?)?(([1十]?[0-9一二三四五六七八九十])月[初中末]?)?(([123一二三]?[0-9一二三四五六七八九十])日)?/g
 };
 
 export interface TimelineExtractorOptions {
@@ -135,12 +135,35 @@ export class TimelineExtractor {
     return timelineEvents;
   }
 
+  private CnDateNumberToArabic(chineseNumber: string): string {
+    const chineseArray: string[] = chineseNumber.split('')
+    const resultArray: number[] = []
+    const length = chineseArray.length;
+    for (let i = 0; i < length; i++) {
+      const character = chineseArray[i]
+      const number = parseInt(character)
+      if (!isNaN(number)) {
+        resultArray.push(number)
+        continue
+      }
+      if (i === 0 && character === '十') {
+        resultArray.push(ChineseToArabicException[character + 'begin'])
+      }
+      if (i === length - 1) {
+        resultArray.push(ChineseToArabicException[character + 'end'])
+      }
+
+      resultArray.push(ChineseToArabic[character])
+    }
+    return resultArray.join('');
+  }
+
   private MatchConvertToDate(match: RegExpMatchArray): EventTime {
     console.log(match);
     const eventTime = {} as EventTime;
-    const year = match[2] ? parseInt(match[2]) : undefined;
-    const month = match[4] ? parseInt(match[4]) : undefined;
-    const day = match[6] ? parseInt(match[6]) : undefined;
+    const year = match[2] ? this.ParseNum(match[2]) : undefined;
+    const month = match[4] ? this.ParseNum(match[4]) : undefined;
+    const day = match[6] ? this.ParseNum(match[6]) : undefined;
     if (year) {
       eventTime.year = year;
     }
@@ -153,6 +176,18 @@ export class TimelineExtractor {
 
     return eventTime;
   }
+
+  private ParseNum(input: string ): number {
+    const inputArray = input.split('');
+    const found = inputArray.some(inputElement => ChineseNumericWords.includes(inputElement));
+    // found means the string contains a chinese numeral word
+    if (found) {
+      return parseInt(this.CnDateNumberToArabic(input));
+    }
+    else {
+      return parseInt(input)
+
+    }  }
 
   private GetSubsequentContextLength(): number {
     return this.GetContextLength().subsequentContextLength;
@@ -385,3 +420,34 @@ export interface ContextLength {
   previousContextLength: number;
   subsequentContextLength: number;
 }
+
+enum ChineseToArabic {
+  零 = 0,
+  一 = 1,
+  二 = 2,
+  三 = 3,
+  四 = 4,
+  五 = 5,
+  六 = 6,
+  七 = 7,
+  八 = 8,
+  九 = 9
+}
+enum ChineseToArabicException {
+  十end = 0,
+  十begin = 1
+}
+
+export const ChineseNumericWords = [
+  '一',
+  '二',
+  '三',
+  '四',
+  '五',
+  '六',
+  '七',
+  '八',
+  '九',
+  '十'
+]
+
