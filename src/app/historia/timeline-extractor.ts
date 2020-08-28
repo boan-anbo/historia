@@ -2,7 +2,7 @@ import * as uuid from 'uuid';
 import {Timeline} from './timeline.entity';
 
 export const Patterns = {
-  chineseMatch: /(([1-2一二]{1}[0-9一二三四五六七八九零][0-9一二三四五六七八九零][0-9一二三四五六七八九零])[年\s][初中末]?)?(([1十]?[0-9一二三四五六七八九十])月[初中末]?)?(([123一二三]?[0-9一二三四五六七八九十])日)?/g
+  chineseMatch: /(([1-2一二１２]{1}[0-9一二三四五六七八九零０１２３４５６７８９][0-9一二三四五六七八九零０１２３４５６７８９][0-9一二三四五六七八九零０１２３４５６７８９])[年\s][初中末]?)?(([1十]?[0-9一二三四五六七八九十０１２３４５６７８９])月[初中末]?)?(([123一二三０１２３]?[0-9一二三四五六七八九十０１２３４５６７８９])日)?/g
 };
 
 export interface TimelineExtractorOptions {
@@ -11,11 +11,6 @@ export interface TimelineExtractorOptions {
 }
 
 export class TimelineExtractor {
-  private inputText: string;
-  private tokenizedSentences: string[];
-  private processedTimelineEvents: TimelineEvent[];
-  private language: Language;
-  private options: TimelineExtractorOptions;
 
 
   constructor(inputText: string, language: Language, options: TimelineExtractorOptions) {
@@ -26,6 +21,46 @@ export class TimelineExtractor {
 
 
   }
+  private inputText: string;
+  private tokenizedSentences: string[];
+  private processedTimelineEvents: TimelineEvent[];
+  private language: Language;
+  private options: TimelineExtractorOptions;
+
+  static CnDateNumberToArabic(chineseNumber: string): string {
+    const chineseArray: string[] = chineseNumber.split('');
+    const resultArray: number[] = [];
+    const length = chineseArray.length;
+    for (let i = 0; i < length; i++) {
+      const character = chineseArray[i];
+      const number = parseInt(character);
+      if (!isNaN(number)) {
+        resultArray.push(number);
+        continue;
+      }
+      if (i === 0 && character === '十') {
+        resultArray.push(ChineseToArabicException[character + 'begin']);
+      }
+      if (i === length - 1) {
+        resultArray.push(ChineseToArabicException[character + 'end']);
+      }
+
+      resultArray.push(ChineseToArabic[character]);
+    }
+    return resultArray.join('');
+  }
+
+  private static ParseNum(input: string ): number {
+    const inputArray = input.split('');
+    const found = inputArray.some(inputElement => ChineseNumericWords.includes(inputElement));
+    // found means the string contains a chinese numeral word
+    if (found) {
+      return parseInt(TimelineExtractor.CnDateNumberToArabic(input));
+    }
+    else {
+      return parseInt(input);
+
+    }  }
 
   private GetContextLength(): ContextLength {
     return this.options.contextLength;
@@ -44,13 +79,31 @@ export class TimelineExtractor {
     }
   }
 
+  private GetSemicolon(): string {
+    const selectedLanguage = LANGUAGE_SYMBOLS.find((item) => item.language === this.GetLanguage());
+    if (selectedLanguage) {
+      return selectedLanguage.symbol.semicolon;
+    } else {
+      throw Error(`CANNOT FIND SEMICOLON SYMBOL FOR ${this.GetLanguage()}`);
+    }
+  }
+
+
   public GetCleanText(input: string): string {
     const placeHolder = '{{S}}';
     // preserve space among latin letters.
     let cleanText = input.replace(/([a-zA-Z])(\s)([a-zA-Z])/g, `$1${placeHolder}$3`);
+
+    // if the language is Chinese, repalce Chinese semicolon with Chinese period, so that connected sentences are break down into independent sentences. Otherwise, the parse sentences will usually be too long.
+    if (this.GetLanguage() === 'Chinese') {
+      const semicolon = new RegExp(this.GetSemicolon(), 'g');
+      cleanText = cleanText.replace(semicolon, this.GetPeriod());
+
+    }
+
     const delimiter = new RegExp(this.IfUseNewLineDelimiter() ? `[\s]` : `[\s\n]`, 'g');
-    cleanText = input.replace(delimiter, '');
-    cleanText = input.replace(placeHolder, ' ');
+    cleanText = cleanText.replace(delimiter, '');
+    cleanText = cleanText.replace(placeHolder, ' ');
     return cleanText;
   }
 
@@ -117,9 +170,14 @@ export class TimelineExtractor {
     });
 
 
+    // fill in dangled month, day events, i.e. those only has day or month but not year marks will be matched to the closest year event before it.
+    const fullfillResults = this.FillDangledMonthDayEvents(filteredResult);
+
+
     // Extract DateTime Entry from the event
     const timelineEvents = [];
-    filteredResult.forEach(entry => {
+
+    fullfillResults.forEach(entry => {
       const timelineEvent = new TimelineEvent();
       timelineEvent.eventTime = this.MatchConvertToDate(entry.regexMatch);
       timelineEvent.event = this.ExtractEvent(entry, input);
@@ -135,35 +193,67 @@ export class TimelineExtractor {
     return timelineEvents;
   }
 
-  private CnDateNumberToArabic(chineseNumber: string): string {
-    const chineseArray: string[] = chineseNumber.split('')
-    const resultArray: number[] = []
-    const length = chineseArray.length;
-    for (let i = 0; i < length; i++) {
-      const character = chineseArray[i]
-      const number = parseInt(character)
-      if (!isNaN(number)) {
-        resultArray.push(number)
-        continue
-      }
-      if (i === 0 && character === '十') {
-        resultArray.push(ChineseToArabicException[character + 'begin'])
-      }
-      if (i === length - 1) {
-        resultArray.push(ChineseToArabicException[character + 'end'])
-      }
+  private MatchPreviousYearMonth(match: RegExpMatchArray, matchIndex: number, array: TimelineEntryMatch[]) {
+    let counter: number = matchIndex;
+    let previousYear: string = match[2];
+    let previousMonth: string = match[4];
+    let currentEntry: RegExpMatchArray;
+    do {
+      counter--;
+      currentEntry = array[counter]?.regexMatch;
+      console.log('Looking at', currentEntry);
+      console.log('For Entgry', match);
+      console.log('Entry month', previousMonth);
+      console.log('Entry year', previousYear);
+      if (currentEntry) {
 
-      resultArray.push(ChineseToArabic[character])
+        const year = currentEntry[2];
+        const month = currentEntry[4];
+        console.log('Entry to full fill', previousMonth, previousYear);
+        console.log('CONSIDERING', year, month);
+        if (month && previousMonth === undefined) {
+          previousMonth = month;
+        }
+        if (year && previousYear === undefined) {
+          previousYear = year;
+        }
+      }
+      if (previousMonth !== undefined && previousYear !== undefined) {
+        match[2] = previousYear;
+        match[4] = previousMonth;
+        console.log('preparing to return', match);
+        return match;
+      }
     }
-    return resultArray.join('');
+    while (counter > 0 && matchIndex - counter < 20);
   }
+
+
+  private FillDangledMonthDayEvents(inputArray: TimelineEntryMatch[]): TimelineEntryMatch[] {
+    return inputArray.map((timelineEntryMatch, timelineEntryMatchIndex, timelineEntryMatches) => {
+      let match = timelineEntryMatch.regexMatch;
+      // two conditions when you need to match dates: when you have day but not month, or when you have month but not year. But when you only have year, but no month, there is no need to match. Or it will result in giving irrevent months to year
+      if (match[2] === undefined || (match[4] === undefined && match[2] === undefined )) {
+
+          console.error(match)
+
+        const filledMatch = this.MatchPreviousYearMonth(match, timelineEntryMatchIndex, timelineEntryMatches);
+        if (filledMatch) {
+          match = filledMatch;
+        }
+      }
+      timelineEntryMatch.regexMatch = match;
+      return timelineEntryMatch;
+    });
+  }
+
 
   private MatchConvertToDate(match: RegExpMatchArray): EventTime {
     console.log(match);
     const eventTime = {} as EventTime;
-    const year = match[2] ? this.ParseNum(match[2]) : undefined;
-    const month = match[4] ? this.ParseNum(match[4]) : undefined;
-    const day = match[6] ? this.ParseNum(match[6]) : undefined;
+    const year = match[2] ? TimelineExtractor.ParseNum(match[2]) : undefined;
+    const month = match[4] ? TimelineExtractor.ParseNum(match[4]) : undefined;
+    const day = match[6] ? TimelineExtractor.ParseNum(match[6]) : undefined;
     if (year) {
       eventTime.year = year;
     }
@@ -176,18 +266,6 @@ export class TimelineExtractor {
 
     return eventTime;
   }
-
-  private ParseNum(input: string ): number {
-    const inputArray = input.split('');
-    const found = inputArray.some(inputElement => ChineseNumericWords.includes(inputElement));
-    // found means the string contains a chinese numeral word
-    if (found) {
-      return parseInt(this.CnDateNumberToArabic(input));
-    }
-    else {
-      return parseInt(input)
-
-    }  }
 
   private GetSubsequentContextLength(): number {
     return this.GetContextLength().subsequentContextLength;
@@ -395,7 +473,8 @@ export const LANGUAGE_SYMBOLS: LanguageSymbol[] = [
   {
     language: Language.Chinese,
     symbol: {
-      period: '。'
+      period: '。',
+      semicolon: '；'
     }
   },
   {
@@ -409,6 +488,7 @@ export const LANGUAGE_SYMBOLS: LanguageSymbol[] = [
 
 export interface Symbols {
   period: string;
+  semicolon?: string;
 }
 
 export interface LanguageSymbol {
@@ -431,7 +511,17 @@ enum ChineseToArabic {
   六 = 6,
   七 = 7,
   八 = 8,
-  九 = 9
+  九 = 9,
+  '０'= 0,
+  '１'= 1,
+  '２'= 2,
+  '３'= 3,
+  '４'= 4,
+  '５'= 5,
+  '６'= 6,
+  '７'= 7,
+  '８' = 8,
+  '９' = 9
 }
 enum ChineseToArabicException {
   十end = 0,
@@ -448,6 +538,16 @@ export const ChineseNumericWords = [
   '七',
   '八',
   '九',
-  '十'
-]
+  '十',
+  '０',
+  '１',
+  '２',
+  '３',
+  '４',
+  '５',
+  '６',
+  '７',
+  '８',
+  '９'
+];
 
